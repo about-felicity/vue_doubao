@@ -22,9 +22,39 @@ cd vue_doubao\dist
 python -m http.server 8766
 ```
 
-## 修改数据
+## 每日更新数据（从本地动态面板生成静态页面）
 
-如果想更新页面上的数据，把新的 `/api/stats` 响应替换掉 `src/snapshot.json`，然后重新构建即可。
+你的本地抓取和动态面板不受影响。服务器上的这个页面只是一个快照，想更新时按下面流程来：
+
+1. 确保本地动态面板在跑（`python doubao_dashboard_server.py`，默认 `http://127.0.0.1:8765`）。
+2. 等抓取/分析完成后，执行：
+
+```powershell
+cd vue_doubao
+python update_snapshots.py
+```
+
+这个脚本会：
+- 抓取“全部问题” + 每个具体问题的 `/api/stats` 数据
+- 写入 `src/snapshots.json`
+- 自动执行 `npm run build`
+
+3. 推送到 GitHub：
+
+```bash
+git add .
+git commit -m "Update daily snapshot"
+git push origin main
+```
+
+4. 在服务器上拉取最新代码：
+
+```bash
+cd /home/doubao/vue_doubao
+git pull origin main
+```
+
+然后刷新网页即可看到新数据。
 
 ## 一键部署到公网
 
