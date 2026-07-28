@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "deploy": "powershell -ExecutionPolicy Bypass -File ../deploy_vue_doubao.ps1"
+    "deploy": "powershell -ExecutionPolicy Bypass -File ./deploy_vue_doubao.ps1"
   },
   "dependencies": {
     "vue": "^3.5.18"
