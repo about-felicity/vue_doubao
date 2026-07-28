@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import snapshot from "./snapshot.json";
+import snapshots from "./snapshots.json";
 
 const ALL_QUESTIONS = "全部问题";
 const tabs = [
@@ -151,8 +151,9 @@ async function refresh({ quiet = false } = {}) {
   if (!quiet) loading.value = true;
   error.value = "";
   try {
-    // Use the hard-coded snapshot so the dashboard can be served as a static page.
-    const payload = snapshot;
+    // Pick the hard-coded snapshot matching the currently selected question.
+    const key = question.value === ALL_QUESTIONS ? "__all__" : question.value;
+    const payload = snapshots[key] || snapshots["__all__"];
     stats.value = payload;
     lastUpdated.value = payload.generated_at || new Date().toLocaleString("zh-CN");
     if (!brandRows.value.some((row) => row.name === selectedBrand.value)) {
