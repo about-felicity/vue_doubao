@@ -28,17 +28,37 @@ python -m http.server 8766
 
 ## 一键部署到公网
 
-项目根目录下提供了 `deploy_vue_doubao.ps1`，默认会部署到 `117.55.234.72:8765`。
+项目根目录下提供了两个部署脚本，默认都会部署到 `117.55.234.72:8765`：
+
+- Windows：[`deploy_vue_doubao.ps1`](./deploy_vue_doubao.ps1)
+- Linux / macOS：[`deploy_vue_doubao.sh`](./deploy_vue_doubao.sh)
+
+Linux/macOS 下：
+
+```bash
+chmod +x deploy_vue_doubao.sh
+./deploy_vue_doubao.sh
+```
+
+Windows PowerShell 下：
 
 ```powershell
-# 在项目根目录执行
 .\deploy_vue_doubao.ps1
 ```
 
-第一次使用请在脚本开头修改 `User` 和 `Key`（SSH 登录用户名与私钥路径），或在命令行传入：
+第一次使用请在脚本开头修改登录信息（用户名、SSH 私钥路径），或设置环境变量：
 
-```powershell
-.\deploy_vue_doubao.ps1 -User "root" -Key "$env:USERPROFILE\.ssh\id_rsa"
+```bash
+export DEPLOY_USER="root"
+export DEPLOY_KEY="$HOME/.ssh/id_rsa"
+./deploy_vue_doubao.sh
 ```
 
 脚本会完成：构建 -> 上传 dist 到服务器 -> 在服务器启动 `python3 -m http.server 8765`。
+
+如果你**已经在服务器上**（比如 `/home/doubao/vue_doubao`），不需要 SSH，直接构建并启动服务即可：
+
+```bash
+npm run build
+nohup python3 -m http.server 8765 --directory dist > /tmp/vue_doubao.log 2>&1 &
+```
