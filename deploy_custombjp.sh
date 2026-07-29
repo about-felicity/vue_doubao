@@ -7,6 +7,7 @@ REPO_URL="${REPO_URL:-https://github.com/about-felicity/vue_doubao.git}"
 BRANCH="${BRANCH:-main}"
 DOMAIN="${DOMAIN:-1any.top}"
 URL_PREFIX="${URL_PREFIX:-/custombjp}"
+EXISTING_PREFIX="${EXISTING_PREFIX:-/customXL}"
 APP_NAME="${APP_NAME:-vue_doubao_bjp}"
 DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/${APP_NAME}}"
 NGINX_CONF="${NGINX_CONF:-/etc/nginx/nginx.conf}"
@@ -75,7 +76,7 @@ install -d -m 0700 "${BACKUP_DIR}"
 BACKUP_FILE="${BACKUP_DIR}/nginx.conf.${RELEASE_ID}.bak"
 cp -a -- "${NGINX_CONF}" "${BACKUP_FILE}"
 
-export DOMAIN URL_PREFIX NGINX_CONF CURRENT_LINK
+export DOMAIN URL_PREFIX EXISTING_PREFIX NGINX_CONF CURRENT_LINK
 python3 <<'PY'
 import os
 import re
@@ -84,8 +85,30 @@ from pathlib import Path
 path = Path(os.environ["NGINX_CONF"])
 domain = os.environ["DOMAIN"]
 prefix = os.environ["URL_PREFIX"]
+existing_prefix = os.environ.get("EXISTING_PREFIX", "/customXL").rstrip("/")
 static_root = os.environ["CURRENT_LINK"].rstrip("/")
 text = path.read_text(encoding="utf-8")
+
+# The existing lock script intentionally allowed only /customXL and returned
+# 403 at server-rewrite phase for every other URI. Expand that whitelist before
+# adding the new location; location precedence alone cannot bypass a server if.
+lock_begin = "        # BEGIN CUSTOMXL ONLY"
+lock_end = "        # END CUSTOMXL ONLY"
+lock_pattern = rf"\n{re.escape(lock_begin)}.*?{re.escape(lock_end)}\n"
+if re.search(lock_pattern, text, flags=re.S):
+    allowed = "|".join(
+        re.escape(item)
+        for item in dict.fromkeys((existing_prefix, prefix))
+    )
+    lock_block = f"""
+{lock_begin}
+        # 仅允许两个客户面板路径；其他域名路径继续返回 403。
+        if ($uri !~ "^(?:{allowed})(?:/|$)") {{
+            return 403;
+        }}
+{lock_end}
+"""
+    text = re.sub(lock_pattern, "\n" + lock_block, text, flags=re.S)
 
 begin = "        # BEGIN CUSTOMBJP MANAGED"
 end = "        # END CUSTOMBJP MANAGED"
