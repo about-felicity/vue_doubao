@@ -37,23 +37,48 @@ const shortTime = (value) => {
   return raw ? raw.slice(0, 16) : "尚无记录";
 };
 const shortDate = (value) => String(value || "").slice(5);
+const deviceValue = (item) => item?.value || item?.name || item?.instance || item;
+const deviceLabel = (item) => {
+  if (!item || typeof item !== "object") return item;
+  const identity = [item.nickname, item.uid_masked].filter(Boolean).join(" · ");
+  return `实例 ${item.instance ?? "—"}${identity ? ` · ${identity}` : ""}`;
+};
 const deltaText = (value, suffix = "") => {
   const n = Number(value || 0);
   return `${n > 0 ? "+" : ""}${n.toFixed(1)}${suffix}`;
 };
 
 const questions = computed(() => stats.value?.questions || []);
+const customerName = computed(() => stats.value?.customer?.name || "Doubao");
 const devices = computed(() => stats.value?.device_options || []);
 const products = computed(() => stats.value?.products || {});
 const topBrands = computed(() => (products.value.by_brand || []).slice(0, 8));
 const topProducts = computed(() => (products.value.by_product || []).slice(0, 12));
+const latestProducts = computed(() =>
+  (products.value.latest_products || []).slice().sort(
+    (a, b) => Number(a.product_index || 999) - Number(b.product_index || 999)
+  )
+);
+const rankSlotLeaders = computed(() => [1, 2, 3].map((rank) => {
+  const rows = (products.value.by_product || [])
+    .map((item) => ({ ...item, slotCount: Number(item.rank_counts?.[String(rank)] || 0) }))
+    .filter((item) => item.slotCount > 0)
+    .sort((a, b) => b.slotCount - a.slotCount || b.count - a.count);
+  return { rank, leaders: rows.slice(0, 3) };
+}));
 const isSingleQuestion = computed(() => question.value !== ALL_QUESTIONS);
 const dailySources = computed(() => stats.value?.daily_question_sources?.[0] || null);
 const dailyProducts = computed(() => stats.value?.daily_question_products?.[0] || null);
 const sourceDates = computed(() => dailySources.value?.dates || []);
 const latestSourceDate = computed(() => sourceDates.value.at(-1) || "");
 const topDailyLinks = computed(() =>
-  (dailySources.value?.top_links_by_date?.[latestSourceDate.value] || []).slice(0, 10)
+  dailySources.value?.top_links_by_date?.[latestSourceDate.value] || []
+);
+const topDailyArticleLinks = computed(() =>
+  topDailyLinks.value.filter((item) => item.type === "文章").slice(0, 10)
+);
+const topDailyVideoLinks = computed(() =>
+  topDailyLinks.value.filter((item) => item.type === "视频").slice(0, 10)
 );
 const latestSourceRefs = computed(() => dailySources.value?.refs_by_date?.at(-1) || 0);
 const latestSourceRuns = computed(() => dailySources.value?.runs_by_date?.at(-1) || 0);
@@ -203,7 +228,7 @@ onBeforeUnmount(() => {
     <header class="topbar">
       <a class="brand" href="./" aria-label="豆包 Signal Desk 首页">
         <span class="brand-mark"><i></i><i></i><i></i></span>
-        <span><b>DOUBAO</b><em>SIGNAL DESK / 2.1</em></span>
+        <span><b>{{ customerName.toUpperCase() }}</b><em>SIGNAL DESK / 2.1</em></span>
       </a>
       <nav class="main-nav" aria-label="主导航">
         <button v-for="tab in tabs" :key="tab.id" :class="{ active: activeTab === tab.id }" @click="selectTab(tab.id)">
@@ -230,12 +255,16 @@ onBeforeUnmount(() => {
         <label for="device">采集设备</label>
         <select id="device" v-model="device">
           <option value="all">全部设备</option>
-          <option v-for="item in devices" :key="item.value || item.name || item" :value="item.value || item.name || item">
-            {{ item.label || item.name || item }}
+          <option v-for="item in devices" :key="deviceValue(item)" :value="deviceValue(item)">
+            {{ item.label || deviceLabel(item) }}
           </option>
         </select>
       </div>
-      <label class="auto-switch"><input v-model="autoRefresh" type="checkbox"><span></span><b>5 秒自动刷新</b></label>
+      <label class="auto-switch" :class="{ active: autoRefresh }">
+        <input v-model="autoRefresh" type="checkbox">
+        <span class="switch-track"><i></i></span>
+        <span class="switch-copy"><b>{{ autoRefresh ? "自动刷新已开启" : "自动刷新已关闭" }}</b><small>每 5 秒同步一次</small></span>
+      </label>
       <div class="stamp"><span>LAST SYNC</span><b>{{ shortTime(lastUpdated) }}</b></div>
     </section>
 
@@ -326,19 +355,31 @@ onBeforeUnmount(() => {
             <article><span>观察日期</span><b>{{ latestSourceDate || "—" }}</b></article>
             <article><span>当日引用</span><b>{{ fmt(latestSourceRefs) }}</b></article>
             <article><span>当日运行</span><b>{{ fmt(latestSourceRuns) }}</b></article>
-            <article><span>独立前十信源</span><b>{{ fmt(topDailyLinks.length) }}</b></article>
+            <article><span>文章 / 视频前十</span><b>{{ fmt(topDailyArticleLinks.length) }} / {{ fmt(topDailyVideoLinks.length) }}</b></article>
           </section>
-          <section class="analytics-grid">
-            <article class="panel span-2">
-              <header class="panel-head"><div><span>TOP 10 TODAY</span><h2>当日信源引用前十</h2></div><b>{{ latestSourceDate }}</b></header>
+          <section class="source-top-grid">
+            <article class="panel source-top-panel">
+              <header class="panel-head"><div><span>ARTICLE TOP 10</span><h2>文章信源链接前十名</h2></div><b>{{ latestSourceDate }}</b></header>
               <div class="source-link-list">
-                <a v-for="(item, index) in topDailyLinks" :key="item.href" :href="item.href" target="_blank" rel="noreferrer">
-                  <span>{{ String(index + 1).padStart(2, "0") }}</span><i :class="{ video: item.type === '视频' }">{{ item.type }}</i>
+                <a v-for="(item, index) in topDailyArticleLinks" :key="item.href" :href="item.href" target="_blank" rel="noreferrer">
+                  <span>{{ String(index + 1).padStart(2, "0") }}</span><i>文章</i>
                   <b>{{ item.title }}</b><strong>{{ fmt(item.count) }} 次</strong><em>↗</em>
                 </a>
-                <div v-if="!topDailyLinks.length" class="empty">当日尚无可展示信源。</div>
+                <div v-if="!topDailyArticleLinks.length" class="empty">当日尚无可展示的文章信源。</div>
               </div>
             </article>
+            <article class="panel source-top-panel">
+              <header class="panel-head"><div><span>VIDEO TOP 10</span><h2>视频信源链接前十名</h2></div><b>{{ latestSourceDate }}</b></header>
+              <div class="source-link-list">
+                <a v-for="(item, index) in topDailyVideoLinks" :key="item.href" :href="item.href" target="_blank" rel="noreferrer">
+                  <span>{{ String(index + 1).padStart(2, "0") }}</span><i class="video">视频</i>
+                  <b>{{ item.title }}</b><strong>{{ fmt(item.count) }} 次</strong><em>↗</em>
+                </a>
+                <div v-if="!topDailyVideoLinks.length" class="empty">当日尚无可展示的视频信源。</div>
+              </div>
+            </article>
+          </section>
+          <section class="analytics-grid source-ranking-grid">
             <article class="panel">
               <header class="panel-head"><div><span>SOURCE RANKING</span><h2>累计信源排行</h2></div></header>
               <div class="segmented"><button :class="{ active: rankMode === 'media' }" @click="rankMode='media'">媒体</button><button :class="{ active: rankMode === 'domain' }" @click="rankMode='domain'">域名</button><button :class="{ active: rankMode === 'type' }" @click="rankMode='type'">类型</button></div>
@@ -424,6 +465,11 @@ onBeforeUnmount(() => {
           <!-- 标题洞察 -->
           <section class="page-intro keyword-intro"><p class="eyebrow"><span>TITLE INTELLIGENCE</span> / 标题洞察</p><h1>标题关键词</h1><p>视频、文章分开查看。</p></section>
           <template v-if="baselineProduct">
+            <div class="title-quality-note">
+              <b>标题完整性</b>
+              <span>已用页面正文补全 {{ fmt(ownedAnalytics.quality?.title_enriched_rows) }} 条标题</span>
+              <span :class="{ warning: ownedAnalytics.quality?.suspected_truncated_rows }">仍疑似截断 {{ fmt(ownedAnalytics.quality?.suspected_truncated_rows) }} 条</span>
+            </div>
             <section class="keyword-selector"><span>视频标题关键词</span><button v-for="row in videoKeywords.slice(0,18)" :key="row.keyword" :class="{active:activeKeyword?.keyword===row.keyword}" @click="selectedKeyword=row.keyword">{{ row.keyword }} <b>{{ pct(row.coverage,0) }}</b></button></section>
             <section class="analytics-grid">
               <article class="panel span-2 trend-panel">
@@ -455,6 +501,24 @@ onBeforeUnmount(() => {
 
           <!-- 产品雷达 -->
           <section class="page-intro product-intro"><p class="eyebrow"><span>PRODUCT RADAR</span> / 产品雷达</p><h1>品牌与产品</h1><p>提及率、排名和每日变化。</p></section>
+          <section class="recommendation-ranks">
+            <article class="panel latest-recommendations">
+              <header class="panel-head"><div><span>LATEST ANSWER ORDER</span><h2>最新正文推荐名次</h2></div><b>RUN {{ products.latest_product_run_no || "—" }}</b></header>
+              <div v-if="latestProducts.length" class="latest-rank-list">
+                <div v-for="item in latestProducts" :key="`${item.run_no}-${item.product_index}-${item.product_name}`">
+                  <span>第 {{ item.product_index }} 名</span><b>{{ item.product_name || item.brand_name || "未识别名称" }}</b><small>{{ item.brand_name }}</small>
+                </div>
+              </div>
+              <div v-else class="empty">最新回答正文尚未提取出产品名次。</div>
+            </article>
+            <article class="panel slot-leaders">
+              <header class="panel-head"><div><span>RANK SLOT WINNERS</span><h2>各名次高频产品</h2></div></header>
+              <div v-for="slot in rankSlotLeaders" :key="slot.rank" class="slot-row">
+                <span>第 {{ slot.rank }} 名</span>
+                <p><b v-for="item in slot.leaders" :key="item.name">{{ item.name }} <em>{{ fmt(item.slotCount) }} 次</em></b><small v-if="!slot.leaders.length">暂无数据</small></p>
+              </div>
+            </article>
+          </section>
           <section class="product-grid">
             <article class="panel brand-board"><header class="panel-head"><div><span>BRAND SHARE</span><h2>品牌声量</h2></div><b>{{ fmt(products.unique_brands) }} BRANDS</b></header><div class="brand-cloud"><div v-for="(brand,index) in topBrands" :key="brand.name" :class="`brand-tile tile-${index}`"><span>{{ String(index+1).padStart(2,"0") }}</span><b>{{ brand.name }}</b><strong>{{ fmt(brand.count) }}</strong></div><div v-if="!topBrands.length" class="empty">完成产品识别后显示品牌声量。</div></div></article>
             <article class="panel product-table"><header class="panel-head"><div><span>PRODUCT LEADERBOARD</span><h2>产品排行</h2></div></header><div class="table-head"><span>#</span><span>产品</span><span>提及</span></div><div v-for="(item,index) in topProducts" :key="item.name" class="table-row"><span>{{ String(index+1).padStart(2,"0") }}</span><b>{{ item.name }}</b><strong>{{ fmt(item.count) }}</strong></div></article>

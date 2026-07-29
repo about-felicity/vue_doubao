@@ -1,6 +1,8 @@
 # vue_doubao
 
-豆包信源面板的纯静态版本。所有数据已经硬编码在 `src/snapshot.json` 中，不依赖后端 API，部署后直接用任意静态服务器托管即可。
+营养健康客户的豆包信源面板纯静态版本。数据来自独立的 `customer_a`
+范围，只包含“维生素B族哪个牌子好”和“辅酶Q10哪个牌子好”。
+所有数据已写入 `src/snapshots.json`，公网页面不依赖本地 API。
 
 ## 仓库
 
@@ -26,7 +28,7 @@ python -m http.server 8766
 
 你的本地抓取和动态面板不受影响。服务器上的这个页面只是一个快照，想更新时按下面流程来：
 
-1. 确保本地动态面板在跑（`python doubao_dashboard_server.py`，默认 `http://127.0.0.1:8765`）。
+1. 确保 `customer_a` 动态面板正在 `http://127.0.0.1:8766` 运行。
 2. 等抓取/分析完成后，执行：
 
 ```powershell
@@ -56,7 +58,27 @@ git pull origin main
 
 然后刷新网页即可看到新数据。
 
-## 一键部署到公网
+## 部署到 1any.top/custombjp
+
+服务器克隆或更新仓库后执行：
+
+```bash
+cd /home/vue_doubao
+git pull origin main
+sudo bash deploy_custombjp.sh
+```
+
+脚本会自动拉取 GitHub 最新 `main`、建立带版本号的静态发布目录、把
+路径安全地写入现有 `1any.top:443` Nginx 站点、校验配置并执行 HTTPS
+健康检查。最终地址：
+
+```text
+https://1any.top/custombjp/
+```
+
+重复执行同一条命令即可更新快照，不会覆盖现有 `/customXL/` 路径。
+
+## 旧版独立端口部署
 
 项目根目录下提供了两个部署脚本，默认都会部署到 `117.55.234.72:8765`：
 
