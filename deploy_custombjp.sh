@@ -175,15 +175,9 @@ managed = f"""
             return 301 https://$host{prefix}/;
         }}
 
-        location = {prefix}/ {{
-            alias {static_root}/index.html;
-            default_type text/html;
-        }}
-
-        location ^~ {prefix}/dashboard-assets/ {{
-            alias {static_root}/dashboard-assets/;
-            expires 7d;
-            add_header Cache-Control "public, immutable";
+        location ^~ {prefix}/ {{
+            alias {static_root}/;
+            index index.html;
         }}
 {end}
 """
