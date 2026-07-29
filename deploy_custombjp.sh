@@ -152,9 +152,15 @@ managed = f"""
             return 301 https://$host{prefix}/;
         }}
 
-        location ^~ {prefix}/ {{
-            alias {static_root}/;
-            index index.html;
+        location = {prefix}/ {{
+            alias {static_root}/index.html;
+            default_type text/html;
+        }}
+
+        location ^~ {prefix}/dashboard-assets/ {{
+            alias {static_root}/dashboard-assets/;
+            expires 7d;
+            add_header Cache-Control "public, immutable";
         }}
 {end}
 """
@@ -187,4 +193,8 @@ for _ in {1..15}; do
 done
 
 echo "Nginx 已加载，但页面健康检查失败。"
+echo "静态文件状态："
+ls -ldZ "${DEPLOY_ROOT}" "${CURRENT_LINK}" "${CURRENT_LINK}/index.html" 2>/dev/null || true
+echo "最近的 Nginx 错误："
+tail -n 30 /var/log/nginx/error.log 2>/dev/null || true
 false
